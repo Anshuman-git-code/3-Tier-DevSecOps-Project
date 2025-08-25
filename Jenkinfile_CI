@@ -55,8 +55,7 @@ pipeline {
                 sh 'trivy fs --format table -o fs-report.html .'
             }
         }
-
-                stage('Build-Tag & Push Backend Docker Image') {
+        stage('Build-Tag & Push Backend Docker Image') {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'docker-cred') {
