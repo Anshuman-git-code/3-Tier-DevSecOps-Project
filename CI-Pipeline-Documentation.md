@@ -238,6 +238,8 @@ When a client requests a simple change, for example, changing the background col
 This ensures automation, consistency, and minimal manual intervention in the CI process.
 
 ---
+There-issue-with-node23-so-changed-to-node16-it-worked
+<img width="1920" height="1080" alt="There-isue-with-node23-so-changed-to-node16-it-worked" src="https://github.com/user-attachments/assets/905ed38e-aade-4522-86b3-a2685455a50b" />
 
 ✅ With this setup, you will have a **DevSecOps-ready CI pipeline** that covers:  
 - **Code Quality** (SonarQube)  
