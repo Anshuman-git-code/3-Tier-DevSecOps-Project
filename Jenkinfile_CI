@@ -1,0 +1,94 @@
+pipeline {
+    agent any
+    
+    tools{
+        nodejs 'nodejs16'
+    }
+    
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+    }
+
+    stages {
+        stage('Git Checkout') {
+            steps {
+                git branch: 'dev', url: 'https://github.com/Anshuman-git-code/3-Tier-DevSecOps-Project.git'
+            }
+        }
+        stage('Frontend compilation') {
+            steps {
+                dir('client') {
+                    sh 'find . -name ".js" -exec node --check {} +'
+                }
+            }
+        }
+        stage('Backend compilation') {
+            steps {
+                dir('api') {
+                    sh 'find . -name ".js" -exec node --check {} +'
+                }
+            }
+        }
+        stage('GitLeaks Scan') {
+            steps {
+                sh 'gitleaks detect --source ./client --exit-code 1'
+                sh 'gitleaks detect --source ./api --exit-code 1'
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar') {
+                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName=NodeJS-project \
+                            -Dsonar.projectKey=NodeJS-PROJECT '''
+                }
+            }
+        }
+        stage('Quality Gate Check') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                }
+            }
+        }
+        stage('Trivy FS Scan') {
+            steps {
+                sh 'trivy fs --format table -o fs-report.html .'
+            }
+        }
+        stage('Build-Tag & Push Backend Docker Image') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker-cred') {
+                        dir('api') {
+                            sh 'docker build -t anshuman0506/backend:latest .'
+                            sh 'trivy image --format table -o backend-image-report.html anshuman0506/backend:latest '
+                            sh 'docker push anshuman0506/backend:latest'
+                           
+                        }
+                    }
+                }
+            }
+        }          
+        stage('Build-Tag & Push Frontend Docker Image') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker-cred') {
+                        dir('client') {
+                            sh 'docker build -t anshuman0506/frontend:latest .'
+                            sh 'trivy image --format table -o frontend-image-report.html anshuman0506/frontend:latest '
+                            sh 'docker push anshuman0506/frontend:latest'
+                        }
+                    }
+                }
+            }
+             
+        }  
+        stage('Docker Deploy via Compose') {
+            steps {
+                script {
+                    sh 'docker-compose up -d'
+                }
+            }
+        }
+    }
+}
