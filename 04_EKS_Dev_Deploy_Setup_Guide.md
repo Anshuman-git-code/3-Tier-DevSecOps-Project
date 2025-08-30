@@ -453,6 +453,7 @@ kubectl apply -f rbac/crb.yaml
 kubectl apply -f rbac/secret.yaml
 ```
 
+
 ### 4. Verify RBAC Setup
 ```bash
 # Check service account
@@ -467,6 +468,206 @@ kubectl get clusterrole,clusterrolebinding | grep jenkins
 # Get service account token (for Jenkins configuration)
 kubectl create token jenkins -n dev
 ```
+
+
+### 5. Jenkins Pipeline 
+```groovy
+pipeline {
+    agent any
+    
+    tools {
+        nodejs 'nodejs16'
+    }
+    
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+    }
+
+    stages {
+        stage('Git Checkout') {
+            steps {
+                git branch: 'K8s-deploy', url: 'https://github.com/Anshuman-git-code/3-Tier-DevSecOps-Project.git'
+            }
+        }
+        stage('Frontend compilation') {
+            steps {
+                dir('client') {
+                    sh 'find . -name "*.js" -exec node --check {} +'
+                }
+            }
+        }
+        stage('Backend compilation') {
+            steps {
+                dir('api') {
+                    sh 'find . -name "*.js" -exec node --check {} +'
+                }
+            }
+        }
+        stage('GitLeaks Scan') {
+            steps {
+                sh 'gitleaks detect --source ./client --exit-code 1'
+                sh 'gitleaks detect --source ./api --exit-code 1'
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar') {
+                    sh '''
+                        $SCANNER_HOME/bin/sonar-scanner \
+                        -Dsonar.projectName=NodeJS-project \
+                        -Dsonar.projectKey=NodeJS-PROJECT
+                    '''
+                }
+            }
+        }
+        stage('Quality Gate Check') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                }
+            }
+        }
+        stage('Trivy FS Scan') {
+            steps {
+                sh 'trivy fs --format table -o fs-report.html .'
+            }
+        }
+        stage('Build-Tag & Push Backend Docker Image') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker-cred') {
+                        dir('api') {
+                            sh 'docker build -t anshuman0506/backend:latest .'
+                            sh 'trivy image --format table -o backend-image-report.html anshuman0506/backend:latest'
+                            sh 'docker push anshuman0506/backend:latest'
+                        }
+                    }
+                }
+            }
+        }          
+        stage('Build-Tag & Push Frontend Docker Image') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker-cred') {
+                        dir('client') {
+                            sh 'docker build -t anshuman0506/frontend:latest .'
+                            sh 'trivy image --format table -o frontend-image-report.html anshuman0506/frontend:latest'
+                            sh 'docker push anshuman0506/frontend:latest'
+                        }
+                    }
+                }
+            }
+        }  
+        stage('K8s-Deploy') {
+            steps {
+                script {
+                    withKubeConfig(
+                        caCertificate: '',
+                        clusterName: 'devopsshack-cluster',
+                        contextName: 'dev',
+                        credentialsId: 'k8-token',
+                        namespace: '',
+                        restrictKubeConfigAccess: false,
+                        serverUrl: 'https://F8324004482C27F9D226F80B264CE407.gr7.ap-south-1.eks.amazonaws.com'
+                    ) {
+                        sh 'kubectl apply -f K8s/sc.yaml -n dev'
+                        sh 'kubectl apply -f K8s/mysql.yaml -n dev'
+                        sh 'kubectl apply -f K8s/backend.yaml -n dev'
+                        sh 'kubectl apply -f K8s/frontend.yaml -n dev'
+                        sleep 30
+                    }
+                }
+            }
+        }
+        stage('K8s-Verify') {
+            steps {
+                script {
+                    withKubeConfig(
+                        caCertificate: '',
+                        clusterName: 'devopsshack-cluster',
+                        contextName: 'dev',
+                        credentialsId: 'k8-token',
+                        namespace: '',
+                        restrictKubeConfigAccess: false,
+                        serverUrl: 'https://F8324004482C27F9D226F80B264CE407.gr7.ap-south-1.eks.amazonaws.com'
+                    ) {
+                        sh 'kubectl get pods -n dev'
+                        sh 'kubectl get svc -n dev'
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+---
+
+### 5.1 **Jenkins Setup**
+- Created **EC2 instances**: one for Jenkins, one for SonarQube.
+- Installed Jenkins on Ubuntu:
+  - Installed Java (prerequisite).
+  - Installed Jenkins LTS.
+  - Enabled Jenkins service for auto-start on boot.
+- Installed **plugins**:
+  - Stage View.
+  - SonarQube Scanner.
+  - NodeJS.
+  - Docker Pipeline.
+  - Kubernetes CLI.
+
+---
+
+### 5.2 **SonarQube Setup**
+- Installed Docker & ran SonarQube container on port `9000`.
+- Configured admin credentials & token.
+- Integrated SonarQube with Jenkins:
+  - Added SonarQube server in Jenkins config.
+  - Added webhook for Quality Gate check.
+
+---
+
+### 5.3 **Jenkins CI/CD Pipeline**
+Pipeline stages included:
+1. **Checkout Code** – Clone repo from GitHub branch `K8s-deploy`.  
+2. **NodeJS Compilation** – Syntax check for frontend & backend JS files.  
+3. **Code Scanning**
+   - **GitLeaks** – Secret detection.  
+   - **SonarQube Analysis** – Code quality check.  
+   - **Trivy FS Scan** – File system scan for vulnerabilities.  
+4. **Docker Build & Push**
+   - Built backend & frontend Docker images.  
+   - Tagged with `latest`.  
+   - Pushed to Docker Hub.  
+   - Scanned images with **Trivy** before pushing.  
+5. **Kubernetes Deployment**
+   - Applied manifests for `Secrets`, `MySQL`, `Backend`, and `Frontend`.  
+   - Used **kubectl apply** within Jenkins pipeline.  
+6. **Kubernetes Verification**
+   - Checked pod status using `kubectl get pods`.  
+   - Verified services using `kubectl get svc`.  
+   - Ensured app was running in namespace `dev`.  
+
+---
+
+### 5.4 **Pipeline Explanation**
+1. **Git Checkout** – Pulls code from GitHub `K8s-deploy` branch.  
+2. **Compilation Check** – Runs Node syntax checks for frontend & backend JS files.  
+3. **GitLeaks** – Scans repo for secrets (tokens, API keys).  
+4. **SonarQube Analysis** – Runs code quality + bug/vulnerability analysis.  
+5. **Quality Gate Check** – Pipeline waits for SonarQube result → can block if fails.  
+6. **Trivy FS Scan** – Scans source code for vulnerabilities (SCA).  
+7. **Docker Build & Push (Backend)** – Builds backend image → scans with Trivy → pushes to Docker Hub.  
+8. **Docker Build & Push (Frontend)** – Same for frontend.  
+9. **K8s-Deploy** – Applies Kubernetes manifests (`sc.yaml`, `mysql.yaml`, `backend.yaml`, `frontend.yaml`) into `dev` namespace.  
+10. **K8s-Verify** – Confirms pods & services are up and running inside the cluster.  
+
+🔒 **Security Layers in CI/CD**:
+- **Secrets Scan**: GitLeaks.  
+- **Code Quality & Vulnerabilities**: SonarQube.  
+- **Image Vulnerability Scan**: Trivy.  
+- **Kubernetes Deployment Verification**: Ensures only healthy workloads run in cluster.
+
 
 ## Verification and Testing
 
