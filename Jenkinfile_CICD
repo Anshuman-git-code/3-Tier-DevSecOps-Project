@@ -1,0 +1,127 @@
+pipeline {
+    agent any
+    
+    tools {
+        nodejs 'nodejs16'
+    }
+    
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'
+    }
+
+    stages {
+        stage('Git Checkout') {
+            steps {
+                git branch: 'K8s-deploy', url: 'https://github.com/Anshuman-git-code/3-Tier-DevSecOps-Project.git'
+            }
+        }
+        stage('Frontend compilation') {
+            steps {
+                dir('client') {
+                    sh 'find . -name "*.js" -exec node --check {} +'
+                }
+            }
+        }
+        stage('Backend compilation') {
+            steps {
+                dir('api') {
+                    sh 'find . -name "*.js" -exec node --check {} +'
+                }
+            }
+        }
+        stage('GitLeaks Scan') {
+            steps {
+                sh 'gitleaks detect --source ./client --exit-code 1'
+                sh 'gitleaks detect --source ./api --exit-code 1'
+            }
+        }
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar') {
+                    sh '''
+                        $SCANNER_HOME/bin/sonar-scanner \
+                        -Dsonar.projectName=NodeJS-project \
+                        -Dsonar.projectKey=NodeJS-PROJECT
+                    '''
+                }
+            }
+        }
+        stage('Quality Gate Check') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token'
+                }
+            }
+        }
+        stage('Trivy FS Scan') {
+            steps {
+                sh 'trivy fs --format table -o fs-report.html .'
+            }
+        }
+        stage('Build-Tag & Push Backend Docker Image') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker-cred') {
+                        dir('api') {
+                            sh 'docker build -t anshuman0506/backend:latest .'
+                            sh 'trivy image --format table -o backend-image-report.html anshuman0506/backend:latest'
+                            sh 'docker push anshuman0506/backend:latest'
+                        }
+                    }
+                }
+            }
+        }          
+        stage('Build-Tag & Push Frontend Docker Image') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker-cred') {
+                        dir('client') {
+                            sh 'docker build -t anshuman0506/frontend:latest .'
+                            sh 'trivy image --format table -o frontend-image-report.html anshuman0506/frontend:latest'
+                            sh 'docker push anshuman0506/frontend:latest'
+                        }
+                    }
+                }
+            }
+        }  
+        stage('K8s-Deploy') {
+            steps {
+                script {
+                    withKubeConfig(
+                        caCertificate: '',
+                        clusterName: 'devopsshack-cluster',
+                        contextName: 'dev',
+                        credentialsId: 'k8-token',
+                        namespace: '',
+                        restrictKubeConfigAccess: false,
+                        serverUrl: 'https://F8324004482C27F9D226F80B264CE407.gr7.ap-south-1.eks.amazonaws.com'
+                    ) {
+                        sh 'kubectl apply -f K8s/sc.yaml -n dev'
+                        sh 'kubectl apply -f K8s/mysql.yaml -n dev'
+                        sh 'kubectl apply -f K8s/backend.yaml -n dev'
+                        sh 'kubectl apply -f K8s/frontend.yaml -n dev'
+                        sleep 30
+                    }
+                }
+            }
+        }
+        stage('K8s-Verify') {
+            steps {
+                script {
+                    withKubeConfig(
+                        caCertificate: '',
+                        clusterName: 'devopsshack-cluster',
+                        contextName: 'dev',
+                        credentialsId: 'k8-token',
+                        namespace: '',
+                        restrictKubeConfigAccess: false,
+                        serverUrl: 'https://F8324004482C27F9D226F80B264CE407.gr7.ap-south-1.eks.amazonaws.com'
+                    ) {
+                        sh 'kubectl get pods -n dev'
+                        sh 'kubectl get svc -n dev'
+                    }
+                }
+            }
+        }
+    }
+}
