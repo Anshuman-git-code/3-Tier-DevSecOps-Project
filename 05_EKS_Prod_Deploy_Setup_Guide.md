@@ -136,7 +136,7 @@ terraform version
 # Navigate to project directory
 cd Mega-Project-Terraform
 
-# Initialize Terraform
+# Initialize Terraform (before procced replace default = "DevOps-Shack" with default = "<Your Key-pair for this instance>")
 terraform init
 
 # Plan deployment
