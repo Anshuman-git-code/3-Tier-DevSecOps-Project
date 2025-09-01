@@ -676,14 +676,352 @@ Code Push (GitHub) → Webhook Trigger → Automated CI Stages → Manual Approv
 
 ---
 
+## Phase 9: Production Kubernetes Manifests Development
+
+### 9.1 3-Tier Application Architecture
+
+**Manifest Directory Structure:**
+```
+3-Tier-DevSecOps-Project/k8s-prod/
+├── backend.yaml      # API service deployment
+├── ci.yaml           # Certificate issuer configuration
+├── frontend.yaml     # Web application deployment
+├── ingress.yaml      # External routing and SSL
+├── mysql.yaml        # Database persistence layer
+└── sc.yaml          # Storage class configuration
+```
+
+### 9.2 Database Layer (mysql.yaml)
+
+**MySQL StatefulSet Configuration:**
+- **Image:** mysql:8
+- **Replicas:** 1 (single instance for consistency)
+- **Storage:** 5Gi EBS volume with ebs-sc StorageClass
+- **Persistence:** StatefulSet with volumeClaimTemplates
+
+**Security Configuration:**
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+  namespace: prod
+stringData:
+  MYSQL_ROOT_PASSWORD: Aditya
+```
+
+**Database Configuration:**
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-config
+  namespace: prod
+data:
+  MYSQL_DATABASE: crud_app
+```
+
+**Database Schema Initialization:**
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL,
+  role ENUM('admin', 'viewer') NOT NULL DEFAULT 'viewer',
+  is_active TINYINT(1) DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**Service Configuration:**
+- **Type:** Headless service (ClusterIP: None)
+- **Port:** 3306 for MySQL communication
+- **Service Discovery:** Internal DNS resolution
+
+### 9.3 Application Layer (backend.yaml)
+
+**Backend API Configuration:**
+- **Image:** anshuman0506/backend:latest
+- **Replicas:** 3 (high availability)
+- **Port:** 5000 (REST API endpoint)
+
+**Database Integration:**
+```yaml
+env:
+  - name: DB_HOST
+    value: mysql
+  - name: DB_USER
+    value: root
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: mysql-secret
+        key: MYSQL_ROOT_PASSWORD
+  - name: DB_NAME
+    valueFrom:
+      configMapKeyRef:
+        name: mysql-config
+        key: MYSQL_DATABASE
+```
+
+**Service Configuration:**
+- **Type:** ClusterIP (internal communication)
+- **Port:** 5000 → 5000 mapping
+
+### 9.4 Presentation Layer (frontend.yaml)
+
+**Frontend Web Application:**
+- **Image:** anshuman0506/frontend:latest
+- **Replicas:** 3 (load distribution)
+- **Port:** 80 (HTTP web server)
+
+**Service Configuration:**
+- **Type:** ClusterIP (internal communication)
+- **Port:** 80 → 80 mapping
+
+### 9.5 Ingress and SSL Configuration
+
+**Domain Configuration (ingress.yaml):**
+- **Primary Domain:** 05anshuman.com
+- **Secondary Domain:** www.05anshuman.com
+
+**Routing Rules:**
+```yaml
+paths:
+  - path: /api
+    pathType: Prefix
+    backend:
+      service:
+        name: backend-svc
+        port:
+          number: 5000
+  - path: /
+    pathType: Prefix
+    backend:
+      service:
+        name: frontend-svc
+        port:
+          number: 80
+```
+
+**SSL/TLS Configuration:**
+```yaml
+annotations:
+  cert-manager.io/cluster-issuer: letsencrypt-prod
+  nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+```
+
+**Certificate Issuer (ci.yaml):**
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: anshuman.mohapatra04@gmail.com
+```
+
+### 9.6 Storage Configuration (sc.yaml)
+
+**EBS Storage Class:**
+```yaml
+apiVersion: storage.k8s.io/v1 
+kind: StorageClass
+metadata:
+  name: ebs-sc
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+```
+
+---
+
+## Phase 10: Production Deployment Automation
+
+### 10.1 Enhanced Pipeline Stages
+
+**Deployment Stage Configuration:**
+```groovy
+stage('Deployment To Prod') {
+    steps {
+        script {
+            withKubeConfig(
+                caCertificate: '', 
+                clusterName: 'devopsshack-cluster', 
+                contextName: '', 
+                credentialsId: 'k8-prod-token', 
+                namespace: 'prod', 
+                restrictKubeConfigAccess: false, 
+                serverUrl: 'https://3AC42B30506471B63B6AEBF1CD95ADF2.gr7.ap-south-1.eks.amazonaws.com'
+            ) {
+                sh 'kubectl apply -f k8s-prod/sc.yaml'
+                sleep 20
+                sh 'kubectl apply -f k8s-prod/mysql.yaml -n prod'
+                sh 'kubectl apply -f k8s-prod/backend.yaml -n prod'
+                sh 'kubectl apply -f k8s-prod/frontend.yaml -n prod'
+                sh 'kubectl apply -f k8s-prod/ci.yaml'
+                sh 'kubectl apply -f k8s-prod/ingress.yaml -n prod'
+                sleep 30
+            }
+        }
+    }
+}
+```
+
+**Verification Stage Configuration:**
+```groovy
+stage('Verify Deployment To Prod') {
+    steps {
+        script {
+            withKubeConfig(
+                caCertificate: '', 
+                clusterName: 'devopsshack-cluster', 
+                contextName: '', 
+                credentialsId: 'k8-prod-token', 
+                namespace: 'prod', 
+                restrictKubeConfigAccess: false, 
+                serverUrl: 'https://3AC42B30506471B63B6AEBF1CD95ADF2.gr7.ap-south-1.eks.amazonaws.com'
+            ) {
+                sh 'kubectl get pods -n prod'
+                sleep 20
+                sh 'kubectl get ingress -n prod'
+            }
+        }
+    }
+}
+```
+
+### 10.2 Deployment Issues and Resolutions
+
+#### Issue 1: EBS Storage Provisioning
+**Problem:** `failed to provision volume with StorageClass "ebs-sc": no EC2 IMDS role found`
+**Root Cause:** EBS CSI driver lacking proper IAM permissions
+**Impact:** MySQL StatefulSet couldn't create persistent storage
+
+**Diagnostic Commands:**
+```bash
+kubectl get pvc -n prod
+kubectl get storageclass
+kubectl get events -n prod --sort-by='.lastTimestamp'
+```
+
+#### Issue 2: StatefulSet Immutable Fields
+**Problem:** `The StatefulSet "mysql" is invalid: spec: Forbidden: updates to statefulset spec`
+**Root Cause:** StatefulSet `volumeClaimTemplates` cannot be modified after creation
+**Resolution:** Implemented StatefulSet and PVC deletion before recreation
+
+**Temporary Solution Applied:**
+```groovy
+// Delete existing StatefulSet and PVC to allow recreation
+sh 'kubectl delete statefulset mysql -n prod --ignore-not-found=true'
+sh 'kubectl delete pvc mysql-persistent-storage-mysql-0 -n prod --ignore-not-found=true'
+sleep 10
+```
+
+#### Issue 3: Incorrect EKS Cluster Endpoint
+**Problem:** Verification stage authentication failure
+**Resolution Commands:**
+```bash
+kubectl cluster-info
+aws eks describe-cluster --name devopsshack-cluster --region ap-south-1 --query 'cluster.endpoint' --output text
+```
+
+### 10.3 Successful Deployment Results
+
+**Production Pods Status:**
+```
+NAME                        READY   STATUS    RESTARTS   AGE
+backend-556bb9c668-28t8p    1/1     Running   0          46m
+backend-556bb9c668-mxcph    1/1     Running   0          46m
+backend-556bb9c668-z5qh8    1/1     Running   0          46m
+frontend-6c8dbd5864-bnswh   1/1     Running   0          46m
+frontend-6c8dbd5864-gmkrh   1/1     Running   0          46m
+frontend-6c8dbd5864-rg6zk   1/1     Running   0          46m
+mysql-0                     1/1     Running   0          7m22s
+```
+
+**Ingress Configuration:**
+```
+NAME                        HOSTS                               ADDRESS
+user-management-ingress     05anshuman.com,www.05anshuman.com   aaa8b0a7955434d64a979c7d425fa1c6-361776107.ap-south-1.elb.amazonaws.com
+```
+
+### 10.4 DNS Configuration and Domain Setup
+
+**Load Balancer Resolution:**
+```bash
+nslookup aaa8b0a7955434d64a979c7d425fa1c6-361776107.ap-south-1.elb.amazonaws.com
+# Result: 13.234.94.234
+```
+
+**GoDaddy DNS Configuration:**
+- **A Record:** 13.234.94.234 (Load Balancer IP)
+- **CNAME Record:** aaa8b0a7955434d64a979c7d425fa1c6-361776107.ap-south-1.elb.amazonaws.com
+
+**DNS Verification:**
+- **Tool:** whatsmydns.net
+- **Verification:** A record and CNAME record propagation
+
+### 10.5 Final Pipeline Reversion
+
+**Current Deployment Stage (Reverted):**
+- Removed StatefulSet/PVC deletion commands
+- Simplified deployment approach
+- Relies on clean initial deployment or manual cleanup
+
+---
+
+## Updated Complete Infrastructure Architecture
+
+### End-to-End Production Workflow
+1. **Code Push** → GitHub repository (main branch)
+2. **Webhook Trigger** → Jenkins pipeline activation
+3. **Automated CI** → Security scanning (GitLeaks, Trivy) + Quality analysis (SonarQube)
+4. **Quality Gates** → SonarQube webhook validation
+5. **Manual Approval** → Human production deployment gate
+6. **Kubernetes Deployment** → 3-tier application to EKS prod namespace
+7. **Verification** → Pod and ingress status validation
+8. **Live Application** → https://05anshuman.com with SSL certificates
+
+### Production Environment Components
+- **Frontend:** 3-replica React/web application
+- **Backend:** 3-replica REST API service
+- **Database:** MySQL 8 StatefulSet with persistent EBS storage
+- **Ingress:** NGINX with SSL termination and domain routing
+- **Security:** Let's Encrypt certificates, Kubernetes secrets
+- **Storage:** EBS CSI driver with 5Gi persistent volumes
+- **Monitoring:** Automated deployment verification
+
+### Infrastructure Security Features
+- **Secrets Management:** Kubernetes native secrets for database passwords
+- **HTTPS Enforcement:** SSL redirect and force SSL redirect
+- **Certificate Automation:** Let's Encrypt with cert-manager
+- **Access Control:** RBAC with dedicated service account tokens
+- **Network Security:** ClusterIP services for internal communication
+- **Persistent Storage:** Data retention across pod restarts
+
+### Deployment Characteristics
+- **High Availability:** Multiple replicas for critical components
+- **Zero-Downtime:** Rolling deployments for application updates
+- **SSL/TLS:** Automatic certificate provisioning and renewal
+- **Domain Integration:** Custom domain with proper DNS configuration
+- **Health Checks:** Automated verification of deployment success
+- **Rollback Capability:** StatefulSet and deployment versioning
+
+---
+
 ## Next Steps
 
-1. **Pipeline Testing:** Execute initial pipeline build to validate webhook integration
-2. **Manual Approval Testing:** Test the approval process and timeout behavior
-3. **Continuous Deployment Setup:** Implement automatic deployment for non-production environments
-4. **Monitoring Setup:** Implement monitoring and logging solutions
-5. **Backup Configuration:** Set up automated backup strategies
-6. **Documentation:** Create operational runbooks and troubleshooting guides
+1. **Monitoring Implementation:** Set up Prometheus and Grafana for application monitoring
+2. **Logging Solution:** Implement centralized logging with ELK stack
+3. **Backup Strategy:** Configure automated database backups
+4. **Disaster Recovery:** Document and test recovery procedures
+5. **Performance Testing:** Load testing and optimization
+6. **Security Hardening:** Additional security measures and vulnerability assessments
 
 ---
 
