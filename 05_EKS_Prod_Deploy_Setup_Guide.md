@@ -573,6 +573,8 @@ kubectl describe secret <secret-name-from-secret.yaml> -n prod
 - Click "Add webhook"
 
 **Testing:** Modify repository content to verify automatic pipeline triggering(before test remove these stage('K8s-Deploy') and stage('K8s-Verify') from pipeline)
+<img width="960" height="540" alt="Automatic-Triggers" src="https://github.com/user-attachments/assets/b910cf4c-1c1b-49e7-a9a0-5c6b5ef7500f" />
+
 
 ### 8.2 Manual Approval Gate Implementation
 
