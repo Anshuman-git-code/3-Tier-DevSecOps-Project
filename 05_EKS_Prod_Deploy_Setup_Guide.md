@@ -201,6 +201,7 @@ kubectl get pods -n ingress-nginx
 kubectl get pods -n cert-manager
 kubectl get pods -n kube-system
 ```
+<img width="1931" height="1000" alt="everything up and running at installer-vm" src="https://github.com/user-attachments/assets/56e9c9d3-22c8-4dda-97b6-38f3e0b36b9a" />
 
 ---
 
@@ -391,6 +392,7 @@ docker ps
   - Password: [Docker Hub token]
   - ID: docker-cred
   - Description: docker-cred
+<img width="960" height="540" alt="Credentials" src="https://github.com/user-attachments/assets/5bc02253-a005-4ba5-a1c8-361a39a5859c" />
 
 ### 5.3 SonarQube Webhook Configuration
 
@@ -399,6 +401,8 @@ docker ps
 - Create Webhook:
   - Name: SonarQube-Webhook
   - URL: `http://13.201.88.16:8080/sonarqube-webhook/`
+
+<img width="960" height="540" alt="Webhook-Configuration" src="https://github.com/user-attachments/assets/9d4044a1-1fb4-49d5-9964-78608735c300" />
 
 ---
 
@@ -426,6 +430,7 @@ kubectl apply -f rbac/cr.yaml -n prod
 kubectl apply -f rbac/crb.yaml -n prod
 kubectl apply -f rbac/secret.yaml -n prod
 ```
+<img width="1920" height="1080" alt="RBAC-CREATED" src="https://github.com/user-attachments/assets/8d9e3e99-46d2-42db-b8c5-42aa994e0ca3" />
 
 ### 6.2 Service Account Token Configuration
 
@@ -469,6 +474,7 @@ kubectl describe secret <secret-name-from-secret.yaml> -n prod
 **Deployment Target:**
 - EKS cluster in `prod` namespace
 - RBAC-controlled access with service account authentication
+<img width="960" height="540" alt="Pipeline-build-Done" src="https://github.com/user-attachments/assets/8f7ad2fc-c334-4b00-9f41-6a2866b21f19" />
 
 ---
 
