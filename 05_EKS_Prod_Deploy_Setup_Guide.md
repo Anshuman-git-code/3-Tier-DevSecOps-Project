@@ -597,6 +597,7 @@ stage('Manual Approval for Production') {
 - **User Interaction:** Manual approval required with "Deploy" button
 - **Pipeline Behavior:** Pipeline pauses until approval or timeout
 - **Fail-Safe:** Pipeline fails if no approval within timeout period
+<img width="960" height="540" alt="Screenshot 2025-09-01 at 11 53 07 AM" src="https://github.com/user-attachments/assets/fcec74a9-1b9d-4981-a605-fc34498b6013" />
 
 ### 8.3 Continuous Delivery Workflow
 
