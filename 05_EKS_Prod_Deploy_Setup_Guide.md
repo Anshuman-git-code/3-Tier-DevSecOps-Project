@@ -430,6 +430,7 @@ kubectl apply -f rbac/cr.yaml -n prod
 kubectl apply -f rbac/crb.yaml -n prod
 kubectl apply -f rbac/secret.yaml -n prod
 ```
+
 <img width="1920" height="1080" alt="RBAC-CREATED" src="https://github.com/user-attachments/assets/8d9e3e99-46d2-42db-b8c5-42aa994e0ca3" />
 
 ### 6.2 Service Account Token Configuration
