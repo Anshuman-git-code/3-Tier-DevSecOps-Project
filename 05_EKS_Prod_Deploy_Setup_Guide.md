@@ -201,6 +201,7 @@ kubectl get pods -n ingress-nginx
 kubectl get pods -n cert-manager
 kubectl get pods -n kube-system
 ```
+
 <img width="1931" height="1000" alt="everything up and running at installer-vm" src="https://github.com/user-attachments/assets/56e9c9d3-22c8-4dda-97b6-38f3e0b36b9a" />
 
 ---
