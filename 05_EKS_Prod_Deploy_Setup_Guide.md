@@ -238,6 +238,19 @@ sudo systemctl start jenkins
 sudo systemctl enable jenkins
 ```
 
+**kubectl Installation:**
+```bash
+# Download latest kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+
+# Make executable and move to PATH
+chmod +x kubectl
+sudo mv kubectl /usr/local/bin/
+
+# Verify installation
+kubectl version --client
+```
+
 **Retrieve Initial Admin Password:**
 ```bash
 sudo cat /var/lib/jenkins/secrets/initialAdminPassword
