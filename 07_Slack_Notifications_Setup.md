@@ -2,6 +2,7 @@
 # Jenkins Slack Notifications - Detailed Documentation
 
 This documentation explains **how to configure Slack notifications in Jenkins** so that teams are notified whenever a pipeline succeeds or fails. The setup integrates Slack with Jenkins using **webhooks, tokens, and plugins**.
+<img width="1918" height="990" alt="Screenshot 2025-09-01 at 6 04 58 PM" src="https://github.com/user-attachments/assets/4b3643c7-8cb5-435d-aba5-e43c12010697" />
 
 ---
 
