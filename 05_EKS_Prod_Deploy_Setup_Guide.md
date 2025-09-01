@@ -949,6 +949,9 @@ mysql-0                     1/1     Running   0          7m22s
 NAME                        HOSTS                               ADDRESS
 user-management-ingress     05anshuman.com,www.05anshuman.com   aaa8b0a7955434d64a979c7d425fa1c6-361776107.ap-south-1.elb.amazonaws.com
 ```
+<img width="1920" height="1080" alt="Screenshot 2025-09-01 at 1 43 07 PM" src="https://github.com/user-attachments/assets/02d3d107-3558-4059-b15f-bdf665bcd92c" />
+<img width="814" height="435" alt="Screenshot 2025-09-01 at 1 15 45 PM" src="https://github.com/user-attachments/assets/35616953-45f7-4b37-b53e-2338fc4bd1f2" />
+<img width="960" height="540" alt="Screenshot 2025-09-01 at 1 22 25 PM" src="https://github.com/user-attachments/assets/3cac372e-f952-4424-9650-83edf5175f1d" />
 
 ### 10.4 DNS Configuration and Domain Setup
 
