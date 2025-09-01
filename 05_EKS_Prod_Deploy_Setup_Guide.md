@@ -197,7 +197,9 @@ kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/
 
 **Verify Installation:**
 ```bash
-kubectl get pods
+kubectl get pods -n ingress-nginx
+kubectl get pods -n cert-manager
+kubectl get pods -n kube-system
 ```
 
 ---
