@@ -166,6 +166,10 @@ kubectl get nodes
 eksctl utils associate-iam-oidc-provider --region ap-south-1 --cluster devopsshack-cluster --approve
 ```
 
+	•	What it does: Associates the EKS cluster with AWS IAM via an OpenID Connect (OIDC) provider.
+	•	Why: This allows Kubernetes service accounts to assume AWS IAM roles securely (IAM Roles for Service Accounts - IRSA).
+	•	Use case: Needed so pods can access AWS services (like EBS, S3, DynamoDB) without hardcoding AWS credentials.
+
 **EBS CSI Driver Service Account:**
 ```bash
 eksctl create iamserviceaccount \
@@ -177,6 +181,9 @@ eksctl create iamserviceaccount \
 --approve \
 --override-existing-serviceaccounts
 ```
+	•	What it does: Creates a Kubernetes Service Account with an IAM role attached that has permissions for the Amazon EBS CSI Driver.
+	•	Why: Allows workloads to dynamically provision and manage EBS volumes for persistent storage.
+	•	Use case: If your app needs persistent storage (like a database running on EKS), this enables automatic volume creation and attachment.
 
 **Install Kubernetes Components:**
 
@@ -184,17 +191,23 @@ eksctl create iamserviceaccount \
 ```bash
 kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/ecr/?ref=release-1.11"
 ```
+	•	Installs the EBS Container Storage Interface (CSI) driver.
+	•	Ensures pods can request PersistentVolumeClaims (PVCs) that map to AWS EBS volumes.
 
 **NGINX Ingress Controller:**
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
 ```
-
+	•	Deploys NGINX as an Ingress Controller.
+	•	Handles routing of external traffic into Kubernetes services (e.g., https://myapp.com → service → pods).
+	•	Essential for exposing apps to the internet.
 **Cert-Manager:**
 ```bash
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.12.0/cert-manager.yaml
 ```
-
+	•	Installs Cert-Manager, a Kubernetes add-on for managing SSL/TLS certificates.
+	•	Automates certificate issuance & renewal (often with Let’s Encrypt).
+	•	Ensures apps are secured with HTTPS without manual certificate handling.
 **Verify Installation:**
 ```bash
 kubectl get pods -n ingress-nginx
