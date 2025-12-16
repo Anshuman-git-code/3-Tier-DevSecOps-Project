@@ -3,6 +3,7 @@
 ## Project Overview & Architecture
 
 This project demonstrates the complete transformation of a 3-tier web application from local development to enterprise-grade production deployment, implementing comprehensive DevSecOps practices with measurable security and performance improvements.
+<img width="5676" height="2148" alt="diagram-export-16-12-2025-16_20_04" src="https://github.com/user-attachments/assets/eb81915a-3b14-4304-bf6b-f37e4caf5186" />
 
 ### Core Application Stack
 **Frontend (Presentation Tier)**
